@@ -1,0 +1,27 @@
+{
+  "canisters": {
+    "FundVerse_backend": {
+      "candid": "src/FundVerse_backend/FundVerse_backend.did",
+      "package": "FundVerse_backend",
+      "type": "rust"
+    },
+    "FundVerse_frontend": {
+      "dependencies": [
+        "FundVerse_backend"
+      ],
+      "source": [
+        "src/FundVerse_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "FundVerse_frontend"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

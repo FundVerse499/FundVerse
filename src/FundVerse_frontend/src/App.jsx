@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { FundVerse_backend } from 'declarations/FundVerse_backend';
-
+import { FundVerse_backend } from "./declarations/FundVerse_backend";
 function App() {
   const [greeting, setGreeting] = useState('');
 

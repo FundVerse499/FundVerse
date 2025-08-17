@@ -1,3 +1,16 @@
+type CampaignCard = record {
+  id: nat64;
+  title: text;
+  category: text;
+  amount_raised: nat64;
+  goal: nat64;
+  end_date: nat64; // seconds
+  days_left: int;
+};
+
+type CampaignStatus = variant { Active; Ended };
+
 service : {
-    "greet": (text) -> (text) query;
+  get_campaign_cards: () -> (vec CampaignCard) query;
+  get_campaign_cards_by_status: (CampaignStatus) -> (vec CampaignCard) query;
 }

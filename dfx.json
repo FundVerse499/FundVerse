@@ -1,30 +1,18 @@
 {
   "canisters": {
     "FundVerse_backend": {
-      "candid": "src/FundVerse_backend/FundVerse_backend.did",
-      "package": "FundVerse_backend",
-      "type": "rust"
+      "type": "rust",
+      "candid": "src/FundVerse_backend/src/FundVerse_backend.did",
+      "package": "FundVerse_backend"
     },
-    "FundVerse_frontend": {
+    "fundverse_frontend": {
+      "type": "assets",
+      "source": [
+        "dist"
+      ],
       "dependencies": [
         "FundVerse_backend"
-      ],
-      "frontend": {
-        "entrypoint": "src/FundVerse_frontend/src/index.html"
-      },
-      "source": [
-        "src/FundVerse_frontend/assets",
-        "dist/FundVerse_frontend/"
-      ],
-      "type": "assets"
+      ]
     }
-  },
-  "defaults": {
-    "build": {
-      "args": "",
-      "packtool": ""
-    }
-  },
-  "output_env_file": ".env",
-  "version": 1
+  }
 }

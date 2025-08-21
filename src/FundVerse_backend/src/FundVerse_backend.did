@@ -1,0 +1,50 @@
+type PaymentMethod = variant { BankTransfer; Fawry; PayMob; Other: text };
+type EscrowStatus = variant { Pending; Held; Released; Refunded };
+
+type Contribution = record {
+  id : nat64;
+  campaign_id : nat64;
+  backer : principal;
+  amount : nat64;
+  method : PaymentMethod;
+  status : EscrowStatus;
+  created_at_ns : nat64;
+  confirmed_at_ns : opt nat64;
+};
+
+type RegisteredUser = record {
+  user_principal : principal;
+  name : text;
+  email : text;
+  registered_at_ns : nat64;
+};
+
+type CampaignMeta = record {
+  campaign_id : nat64;
+  goal : nat64;
+  amount_raised : nat64;
+  end_date_secs : nat64;
+};
+
+type EscrowSummary = record {
+  campaign_id : nat64;
+  total_pending : nat64;
+  total_held : nat64;
+  total_released : nat64;
+  total_refunded : nat64;
+};
+
+service : {
+  register_user : (text, text) -> (variant { Ok : null; Err : text });
+  is_registered : (opt principal) -> (bool) query;
+  get_my_profile : () -> (opt RegisteredUser) query;
+
+  contribute : (principal, nat64, nat64, PaymentMethod) -> (variant { Ok : nat64; Err : text });
+  confirm_payment : (nat64, principal) -> (variant { Ok : null; Err : text });
+  release_campaign : (principal, nat64) -> (variant { Ok : nat64; Err : text });
+  refund_campaign : (nat64) -> (variant { Ok : nat64; Err : text });
+
+  get_contributions_by_user : (opt principal) -> (vec Contribution) query;
+  get_campaign_contributions : (nat64) -> (vec Contribution) query;
+  get_escrow_summary : (nat64) -> (EscrowSummary) query;
+}

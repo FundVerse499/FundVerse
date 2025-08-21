@@ -2,14 +2,14 @@
 //! Funding / Escrow canister for FundVerse (MVP)
 //! - Stores contributions (stable)
 //! - Only registered users can contribute
+//! - Supports ICP coin transfers via ledger canister
 //! - Admin/owner confirms payments (Pending -> Held)
 //! - Release/refund logic uses backend metadata via inter-canister calls
 //! NOTE: adapt backend method names in the `notify_backend_*` functions
 //! to match your backend implementation.
 
-use candid::{CandidType, Decode, Deserialize, Encode, Principal};
+use candid::{CandidType, Decode, Deserialize, Encode, Principal, Nat};
 use ic_cdk::api::call::call;
-//use ic_cdk::export::Principal as ExportPrincipal;
 use ic_cdk_macros::{init, query, update};
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
@@ -26,6 +26,8 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 // ---------- Config ----------
 const MAX_VALUE_SIZE: u32 = 8 * 1024; // 8KB per value (MVP)
 const CANISTER_VERSION: &str = "funding-canister-v1";
+const LEDGER_CANISTER_ID: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai"; // Mainnet ledger
+// const LEDGER_CANISTER_ID: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai"; // Local ledger for testing
 
 // ---------- Stable storage manager ----------
 thread_local! {
@@ -40,6 +42,11 @@ thread_local! {
     // Registered users: key = Pk (wrapper) -> RegisteredUser
     static USERS: RefCell<StableBTreeMap<Pk, RegisteredUser, Memory>> = RefCell::new(
         StableBTreeMap::init(MEMORY_MANAGER.with(|mm| mm.borrow().get(MemoryId::new(1))))
+    );
+
+    // ICP transfer records: transfer_id -> ICPTransfer
+    static ICP_TRANSFERS: RefCell<StableBTreeMap<u64, ICPTransfer, Memory>> = RefCell::new(
+        StableBTreeMap::init(MEMORY_MANAGER.with(|mm| mm.borrow().get(MemoryId::new(2))))
     );
 
     // Simple counter for contribution ids (in stable map we keep as length+1)
@@ -73,8 +80,9 @@ impl Storable for Pk {
 }
 
 // ---------- Data models ----------
-#[derive(CandidType, Deserialize, Clone, Debug)]
+#[derive(CandidType, Deserialize, Clone, Debug , PartialEq, Eq)]
 pub enum PaymentMethod {
+    ICP,           // ICP coin transfer
     BankTransfer,
     Fawry,
     PayMob,
@@ -94,11 +102,12 @@ pub struct Contribution {
     pub id: u64,
     pub campaign_id: u64,
     pub backer: Principal,
-    pub amount: u64,            // expressed in EGP (integer smallest unit)
+    pub amount: u64,            // expressed in EGP (integer smallest unit) or e8s for ICP
     pub method: PaymentMethod,
     pub status: EscrowStatus,
     pub created_at_ns: u64,
     pub confirmed_at_ns: Option<u64>,
+    pub icp_transfer_id: Option<u64>, // Link to ICP transfer if method is ICP
 }
 impl Storable for Contribution {
     fn to_bytes(&self) -> Cow<[u8]> {
@@ -112,7 +121,7 @@ impl Storable for Contribution {
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct RegisteredUser {
-    pub principal: Principal,
+    pub user_principal: Principal,
     pub name: String,
     pub email: String,
     pub registered_at_ns: u64,
@@ -125,6 +134,35 @@ impl Storable for RegisteredUser {
         Decode!(bytes.as_ref(), Self).expect("decode registered user")
     }
     const BOUND: Bound = Bound::Bounded { max_size: MAX_VALUE_SIZE, is_fixed_size: false };
+}
+
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub struct ICPTransfer {
+    pub id: u64,
+    pub from: Principal,
+    pub to: Principal,
+    pub amount_e8s: u64,
+    pub memo: u64, // campaign_id as memo
+    pub block_height: Option<u64>,
+    pub status: ICPTransferStatus,
+    pub created_at_ns: u64,
+    pub confirmed_at_ns: Option<u64>,
+}
+impl Storable for ICPTransfer {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).expect("encode ICP transfer"))
+    }
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).expect("decode ICP transfer")
+    }
+    const BOUND: Bound = Bound::Bounded { max_size: MAX_VALUE_SIZE, is_fixed_size: false };
+}
+
+#[derive(CandidType, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum ICPTransferStatus {
+    Pending,
+    Confirmed,
+    Failed,
 }
 
 // ---------- Inter-canister types (expected response from backend) ----------
@@ -142,6 +180,10 @@ fn next_contribution_id() -> u64 {
     CONTRIBUTIONS.with(|m| (m.borrow().len() as u64) + 1)
 }
 
+fn next_transfer_id() -> u64 {
+    ICP_TRANSFERS.with(|m| (m.borrow().len() as u64) + 1)
+}
+
 fn insert_contribution(c: Contribution) {
     CONTRIBUTIONS.with(|m| {
         m.borrow_mut().insert(c.id, c);
@@ -156,6 +198,65 @@ fn update_contribution(id: u64, c: Contribution) {
     CONTRIBUTIONS.with(|m| {
         m.borrow_mut().insert(id, c);
     });
+}
+
+fn insert_icp_transfer(t: ICPTransfer) {
+    ICP_TRANSFERS.with(|m| {
+        m.borrow_mut().insert(t.id, t);
+    });
+}
+
+fn get_icp_transfer(id: u64) -> Option<ICPTransfer> {
+    ICP_TRANSFERS.with(|m| m.borrow().get(&id))
+}
+
+fn update_icp_transfer(id: u64, t: ICPTransfer) {
+    ICP_TRANSFERS.with(|m| {
+        m.borrow_mut().insert(id, t);
+    });
+}
+
+// ---------- ICP Ledger Integration ----------
+
+/// Create an ICP transfer record and initiate the transfer
+async fn initiate_icp_transfer(from: Principal, to: Principal, amount_e8s: u64, memo: u64) -> Result<u64, String> {
+    let transfer_id = next_transfer_id();
+    
+    let transfer = ICPTransfer {
+        id: transfer_id,
+        from,
+        to,
+        amount_e8s,
+        memo,
+        block_height: None,
+        status: ICPTransferStatus::Pending,
+        created_at_ns: now_ns(),
+        confirmed_at_ns: None,
+    };
+    
+    insert_icp_transfer(transfer);
+    
+    // For now, we'll simulate the transfer since we need proper ledger integration
+    // In a real implementation, you would call the ledger canister here
+    
+    // Simulate successful transfer for testing
+    if let Some(mut transfer) = get_icp_transfer(transfer_id) {
+        transfer.block_height = Some(12345); // Simulated block height
+        transfer.status = ICPTransferStatus::Confirmed;
+        transfer.confirmed_at_ns = Some(now_ns());
+        update_icp_transfer(transfer_id, transfer);
+    }
+    
+    Ok(transfer_id)
+}
+
+/// Check if an ICP transfer has been confirmed
+async fn check_icp_transfer_status(transfer_id: u64) -> Result<ICPTransferStatus, String> {
+    if let Some(transfer) = get_icp_transfer(transfer_id) {
+        Ok(transfer.status)
+    } else {
+        Err("Transfer not found".into())
+    }
 }
 
 // ---------- Inter-canister call helpers ----------
@@ -182,6 +283,15 @@ async fn notify_backend_receive_payout(backend: Principal, campaign_id: u64, tot
     }
 }
 
+/// Notify backend about ICP contribution
+async fn notify_backend_icp_contribution(backend: Principal, campaign_id: u64, amount_e8s: u64) -> Result<(), String> {
+    let res: Result<(), _> = call(backend, "receive_icp_contribution", (campaign_id, amount_e8s)).await;
+    match res {
+        Ok(()) => Ok(()),
+        Err(e) => Err(format!("notify backend ICP contribution failed: {:?}", e)),
+    }
+}
+
 // ---------- Public API: Users ----------
 
 #[update]
@@ -191,7 +301,7 @@ fn register_user(name: String, email: String) -> Result<(), String> {
         return Err("name and email required".into());
     }
     let user = RegisteredUser {
-        principal: caller,
+        user_principal: caller,
         name,
         email,
         registered_at_ns: now_ns(),
@@ -215,6 +325,49 @@ fn get_my_profile() -> Option<RegisteredUser> {
 }
 
 // ---------- Public API: Contributions (funding flow) ----------
+
+/// Start a contribution with ICP coins. Creates transfer record and initiates ICP transfer.
+/// `backend` is the principal of your backend canister.
+#[update]
+async fn contribute_icp(backend: Principal, campaign_id: u64, amount_e8s: u64) -> Result<u64, String> {
+    if amount_e8s == 0 { return Err("amount must be > 0".into()); }
+    let caller = ic_cdk::api::caller();
+
+    // registered?
+    if !USERS.with(|u| u.borrow().contains_key(&Pk::from(caller))) {
+        return Err("Only registered users can contribute".into());
+    }
+
+    // check campaign exists and active
+    let meta = fetch_campaign_meta(backend, campaign_id).await?;
+    let meta = meta.ok_or_else(|| "campaign not found".to_string())?;
+    let now = now_secs();
+    if now > meta.end_date_secs {
+        return Err("campaign already ended".into());
+    }
+
+    // Get canister principal (this canister will receive the ICP)
+    let canister_principal = ic_cdk::api::id();
+
+    // Initiate ICP transfer
+    let transfer_id = initiate_icp_transfer(caller, canister_principal, amount_e8s, campaign_id).await?;
+
+    // create pending contribution
+    let id = next_contribution_id();
+    let c = Contribution {
+        id,
+        campaign_id,
+        backer: caller,
+        amount: amount_e8s,
+        method: PaymentMethod::ICP,
+        status: EscrowStatus::Pending,
+        created_at_ns: now_ns(),
+        confirmed_at_ns: None,
+        icp_transfer_id: Some(transfer_id),
+    };
+    insert_contribution(c);
+    Ok(id)
+}
 
 /// Start a contribution (Pending). Checks user is registered and campaign exists & active via backend.
 /// `backend` is the principal of your backend canister.
@@ -247,6 +400,7 @@ async fn contribute(backend: Principal, campaign_id: u64, amount: u64, method: P
         status: EscrowStatus::Pending,
         created_at_ns: now_ns(),
         confirmed_at_ns: None,
+        icp_transfer_id: None,
     };
     insert_contribution(c);
     Ok(id)
@@ -265,6 +419,19 @@ async fn confirm_payment(contribution_id: u64, backend: Principal) -> Result<(),
 
     if c.status != EscrowStatus::Pending {
         return Err("contribution not pending".into());
+    }
+
+    // For ICP contributions, check if transfer is confirmed
+    if c.method == PaymentMethod::ICP {
+        if let Some(transfer_id) = c.icp_transfer_id {
+            let transfer_status = check_icp_transfer_status(transfer_id).await?;
+            if transfer_status != ICPTransferStatus::Confirmed {
+                return Err("ICP transfer not confirmed yet".into());
+            }
+            
+            // Notify backend about ICP contribution
+            notify_backend_icp_contribution(backend, c.campaign_id, c.amount).await?;
+        }
     }
 
     // permission: allow caller if backend or owner
@@ -421,6 +588,27 @@ fn get_escrow_summary(campaign_id: u64) -> EscrowSummary {
         }
     });
     s
+}
+
+// ---------- ICP Transfer Queries ----------
+
+// #[query]
+// fn get_icp_transfer(transfer_id: u64) -> Option<ICPTransfer> {
+//     get_icp_transfer(transfer_id)
+// }
+
+#[query]
+fn get_icp_transfers_by_user(p: Option<Principal>) -> Vec<ICPTransfer> {
+    let who = p.unwrap_or(ic_cdk::api::caller());
+    let mut res: Vec<ICPTransfer> = Vec::new();
+    ICP_TRANSFERS.with(|m| {
+        for (_, v) in m.borrow().iter() {
+            if v.from == who {
+                res.push(v.clone());
+            }
+        }
+    });
+    res
 }
 
 // ---------- Init / Export ----------

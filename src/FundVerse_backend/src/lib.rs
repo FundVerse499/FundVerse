@@ -1,6 +1,7 @@
 // FundVerse_backend/src/lib.rs
 
 //! FundVerse Backend: Ideas + Campaigns with a foreign-key relation (campaign.idea_id -> ideas)
+//! Now supports ICP coin funding via Fund_Flow canister integration
 
 use std::{borrow::Cow, cell::RefCell};
 
@@ -26,7 +27,6 @@ thread_local! {
     static IDEA_COUNTER: std::cell::RefCell<u64> = std::cell::RefCell::new(0);
     static DOC_COUNTER: std::cell::RefCell<u64> = std::cell::RefCell::new(0);
 
-
     static IDEAS: RefCell<StableBTreeMap<u64, Idea, Memory>> = RefCell::new(
         // Use memory 0 for ideas map
         StableBTreeMap::init(
@@ -36,6 +36,9 @@ thread_local! {
 
     // In-heap vector for campaigns (simple MVP). You can move this to stable later if needed.
     static CAMPAIGNS: RefCell<Vec<Campaign>> = RefCell::new(Vec::new());
+    
+    // ICP contributions tracking: campaign_id -> total ICP amount in e8s
+    static ICP_CONTRIBUTIONS: RefCell<HashMap<u64, u64>> = RefCell::new(HashMap::new());
 }
 
 // ------------- Data Models -------------
@@ -116,6 +119,15 @@ pub struct CampaignWithIdea {
     pub idea: Idea,
 }
 
+// New struct for Fund_Flow canister integration
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub struct CampaignMeta {
+    pub campaign_id: u64,
+    pub goal: u64,
+    pub amount_raised: u64,
+    pub end_date_secs: u64, // seconds since epoch
+}
+
 // ------------- Helpers -------------
 
 fn now_secs() -> u64 {
@@ -142,11 +154,25 @@ fn get_idea(id: u64) -> Option<Idea> {
     IDEAS.with(|map| map.borrow().get(&id))
 }
 
+fn get_campaign(id: u64) -> Option<Campaign> {
+    CAMPAIGNS.with(|store| {
+        store.borrow().iter().find(|c| c.id == id).cloned()
+    })
+}
+
+fn update_campaign_amount(campaign_id: u64, new_amount: u64) {
+    CAMPAIGNS.with(|store| {
+        if let Some(campaign) = store.borrow_mut().iter_mut().find(|c| c.id == campaign_id) {
+            campaign.amount_raised = new_amount;
+        }
+    });
+}
+
 /// Upload a document for an Idea. Returns the new doc_id or None if idea doesn't exist.
 #[update]
 fn upload_doc(idea_id: u64, name: String, content_type: String, data: Vec<u8>, uploaded_at: u64) -> Option<u64> {
     if !IDEAS.with(|ideas| ideas.borrow().contains_key(&idea_id)) {
-        return None; // idea doesn’t exist
+        return None; // idea doesn't exist
     }
 
     DOC_COUNTER.with(|c| {
@@ -176,9 +202,6 @@ fn upload_doc(idea_id: u64, name: String, content_type: String, data: Vec<u8>, u
         Some(doc_id)
     })
 }
-
-
-
 
 // ------------- Public API -------------
 
@@ -312,6 +335,83 @@ fn get_campaign_with_idea(campaign_id: u64) -> Option<CampaignWithIdea> {
 #[query]
 fn get_idea_by_id(idea_id: u64) -> Option<Idea> {
     get_idea(idea_id)
+}
+
+// ------------- Fund_Flow Integration Methods -------------
+
+/// Get campaign metadata for Fund_Flow canister
+#[query]
+fn get_campaign_meta(campaign_id: u64) -> Option<CampaignMeta> {
+    get_campaign(campaign_id).map(|campaign| CampaignMeta {
+        campaign_id: campaign.id,
+        goal: campaign.goal,
+        amount_raised: campaign.amount_raised,
+        end_date_secs: campaign.end_date,
+    })
+}
+
+/// Receive ICP contribution from Fund_Flow canister
+#[update]
+fn receive_icp_contribution(campaign_id: u64, amount_e8s: u64) -> Result<(), String> {
+    // Verify campaign exists
+    let Some(campaign) = get_campaign(campaign_id) else {
+        return Err("Campaign not found".into());
+    };
+    
+    // Update ICP contributions tracking
+    ICP_CONTRIBUTIONS.with(|contributions| {
+        let mut contributions = contributions.borrow_mut();
+        let current = contributions.get(&campaign_id).unwrap_or(&0).clone();
+        contributions.insert(campaign_id, current + amount_e8s);
+    });
+    
+    // Update campaign amount raised
+    let new_amount = campaign.amount_raised + amount_e8s;
+    update_campaign_amount(campaign_id, new_amount);
+    
+    // Update the idea's current funding as well
+    IDEAS.with(|ideas| {
+        if let Some(mut idea) = ideas.borrow_mut().get(&campaign.idea_id) {
+            idea.current_funding = idea.current_funding.saturating_add(amount_e8s);
+            idea.updated_at = ic_cdk::api::time();
+            ideas.borrow_mut().insert(campaign.idea_id, idea);
+        }
+    });
+    
+    Ok(())
+}
+
+/// Receive payout notification from Fund_Flow canister
+#[update]
+fn receive_payout(campaign_id: u64, total_amount: u64) -> Result<(), String> {
+    // This method is called when Fund_Flow releases funds to project owner
+    // For now, we just log the payout. In a real implementation, you might:
+    // - Transfer ICP to project owner's wallet
+    // - Update campaign status
+    // - Send notifications
+    
+    ic_cdk::println!("Payout received for campaign {}: {} e8s", campaign_id, total_amount);
+    
+    // Update campaign status or mark as completed
+    // You could add a status field to Campaign struct for this
+    
+    Ok(())
+}
+
+/// Get ICP contribution amount for a campaign
+#[query]
+fn get_icp_contribution(campaign_id: u64) -> u64 {
+    ICP_CONTRIBUTIONS.with(|contributions| {
+        contributions.borrow().get(&campaign_id).unwrap_or(&0).clone()
+    })
+}
+
+/// Get total funding (ICP + other methods) for a campaign
+#[query]
+fn get_campaign_total_funding(campaign_id: u64) -> u64 {
+    let campaign_amount = get_campaign(campaign_id).map(|c| c.amount_raised).unwrap_or(0);
+    let icp_amount = get_icp_contribution(campaign_id);
+    campaign_amount + icp_amount
 }
 
 // ------------- Demo Seed -------------

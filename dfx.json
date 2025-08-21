@@ -16,9 +16,15 @@
       },
       "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz"
     },
+    "Fund_Flow": {
+      "candid": "src/Fund_Flow/src/Fund_Flow.did",
+      "package": "Fund_Flow",
+      "type": "rust"
+    },
     "FundVerse_frontend": {
       "dependencies": [
-        "FundVerse_backend"
+        "FundVerse_backend",
+        "Fund_Flow"
       ],
       "source": [
         "src/FundVerse_frontend/dist"

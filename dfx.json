@@ -1,9 +1,9 @@
 {
   "canisters": {
-    "FundVerse_backend": {
+    "Fund_Flow": {
       "type": "rust",
-      "candid": "src/FundVerse_backend/src/FundVerse_backend.did",
-      "package": "FundVerse_backend"
+      "candid": "src/Fund_Flow/src/Fund_Flow.did",
+      "package": "Fund_Flow"
     },
     "fundverse_frontend": {
       "type": "assets",
@@ -11,7 +11,7 @@
         "dist"
       ],
       "dependencies": [
-        "FundVerse_backend"
+        "Fund_Flow"
       ]
     }
   }

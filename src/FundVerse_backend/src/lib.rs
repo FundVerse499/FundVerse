@@ -317,38 +317,7 @@ fn get_idea_by_id(idea_id: u64) -> Option<Idea> {
 // ------------- Demo Seed -------------
 
 #[init]
-fn init() {
-    let now = ic_cdk::api::time(); // nanoseconds since epoch
-
-    // ---- Seed Idea 1 ----
-    let idea1_id = create_idea(
-        "Eco-Friendly Water Bottles".into(),
-        "Reusable bottles made from recycled materials".into(),
-        100_000,
-        "EcoCorp LLC".into(),
-        "contact@ecocorp.example".into(),
-        "Environment".into(),
-        1,
-    );
-
-    // ---- Seed Idea 2 ----
-    let idea2_id = create_idea(
-        "Indie Pixel Art Game".into(),
-        "A cozy RPG with retro pixel art".into(),
-        100_000,
-        "IndieStudio Ltd".into(),
-        "hello@indiestudio.example".into(),
-        "Gaming".into(),
-        1,
-    );
-
-    // ---- Seed Campaigns ----
-    // Active (+7 days)
-    let _ = create_campaign(idea1_id, 100_000, now + 7 * 86_400 * 1_000_000_000);
-
-    // Ended (-5 days)
-    let _ = create_campaign(idea2_id, 100_000, now - 5 * 86_400 * 1_000_000_000);
-}
+fn init() {}
 
 
 // Export Candid for tooling & UI integration

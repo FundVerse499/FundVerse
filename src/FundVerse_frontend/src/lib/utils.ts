@@ -11,9 +11,12 @@ export function formatE8s(e8s: bigint | number): string {
 }
 
 export function formatCurrency(amount: number, currency: string = 'ICP'): string {
+  if (currency === 'ICP') {
+    return `${amount.toFixed(8)} ICP`;
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency === 'ICP' ? 'USD' : currency,
+    currency: currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 8,
   }).format(amount);
@@ -46,3 +49,13 @@ export function truncateAddress(address: string, length: number = 8): string {
   if (address.length <= length * 2) return address;
   return `${address.slice(0, length)}...${address.slice(-length)}`;
 }
+
+export const handleICError = (error: any): { message: string; code?: string } => {
+  if (typeof error === 'object' && error?.message) {
+    return { message: error.message, code: error.code };
+  }
+  if (typeof error === 'string') {
+    return { message: error };
+  }
+  return { message: 'An unknown error occurred' };
+};

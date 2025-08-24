@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { formatCurrency, formatE8s } from '../lib/utils';
 import { TrendingUp, Users, Target, Clock } from 'lucide-react';
@@ -219,3 +219,5 @@ export const Dashboard: React.FC<DashboardProps> = ({ campaigns }) => {
     </div>
   );
 };
+
+export default Dashboard;

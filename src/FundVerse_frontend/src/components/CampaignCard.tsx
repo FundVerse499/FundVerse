@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Progress } from '../components/ui/progress';
-import { Badge } from '../components/ui/badge';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Progress } from './ui/progress';
+import { Badge } from './ui/badge';
 import { formatE8s, formatCurrency, calculateProgress, getDaysLeft, truncateAddress } from '../lib/utils';
 import { FUND_FLOW_CANISTER_ID_STR } from '../lib/ic';
 import { Copy, ExternalLink, TrendingUp, Clock, Target, Zap, CheckCircle } from 'lucide-react';
@@ -192,3 +192,5 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     </Card>
   );
 };
+
+export default CampaignCard;

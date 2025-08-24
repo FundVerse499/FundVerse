@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './components/ui/button';
-import { CampaignCard } from './components/CampaignCard';
-import { CreateProjectDialog } from './components/CreateProjectDialog';
-import { ContributionDialog } from './components/ContributionDialog';
-import { Dashboard } from './components/Dashboard';
+import CampaignCard from './components/CampaignCard';
+import CreateProjectDialog from './components/CreateProjectDialog';
+import ContributionDialog from './components/ContributionDialog';
+import Dashboard from './components/Dashboard';
 import { 
   createFundVerseBackendActor, 
   createFundFlowActor, 
@@ -25,7 +25,8 @@ import {
   Globe,
   User,
   Copy,
-  CheckCircle
+  CheckCircle,
+  RefreshCw
 } from 'lucide-react';
 import type { ActorSubclass } from "@dfinity/agent";
 import type { Principal } from "@dfinity/principal";
@@ -60,6 +61,7 @@ function App() {
     campaignId: BigInt(0),
     campaignTitle: '',
   });
+  const [refreshing, setRefreshing] = useState(false);
 
   // Initialize app and check authentication
   useEffect(() => {
@@ -113,6 +115,7 @@ function App() {
     if (!backendActor) return;
 
     try {
+      setRefreshing(true);
       setError(null);
       const campaignCards = await backendActor.get_campaign_cards();
       setCampaigns(campaignCards as Campaign[]);
@@ -120,6 +123,8 @@ function App() {
       console.error('Failed to load campaigns:', error);
       const icError = handleICError(error);
       setError(`Failed to load campaigns: ${icError.message}`);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -333,6 +338,16 @@ function App() {
                   </Button>
                 </div>
               )}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadCampaigns}
+                disabled={refreshing}
+                className="btn-web3-secondary"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              </Button>
 
               {backendActor && (
                 <CreateProjectDialog

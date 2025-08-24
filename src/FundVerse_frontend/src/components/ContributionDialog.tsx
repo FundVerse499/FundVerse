@@ -9,10 +9,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../components/ui/dialog';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
+} from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { formatCurrency, handleICError } from '../lib/utils';
 import { Loader2, TrendingUp, Zap, AlertCircle, CheckCircle, Coins } from 'lucide-react';
 
@@ -252,3 +252,5 @@ export const ContributionDialog: React.FC<ContributionDialogProps> = ({
     </Dialog>
   );
 };
+
+export default ContributionDialog;

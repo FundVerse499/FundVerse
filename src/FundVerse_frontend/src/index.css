@@ -67,10 +67,6 @@
     @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   }
-  
-  html {
-    @apply dark;
-  }
 }
 
 /* Web3 Gradient Backgrounds */

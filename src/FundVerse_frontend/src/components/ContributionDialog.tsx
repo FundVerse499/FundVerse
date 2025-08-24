@@ -13,17 +13,16 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { FundFlow, FundVerseBackend } from '../lib/ic';
-import { formatE8s, formatCurrency } from '../lib/utils';
-import { Loader2, TrendingUp } from 'lucide-react';
+import { formatCurrency, handleICError } from '../lib/utils';
+import { Loader2, TrendingUp, Zap, AlertCircle, CheckCircle, Coins } from 'lucide-react';
 
 const contributionSchema = z.object({
   amount: z.string().min(1, 'Amount is required'),
 }).refine((data) => {
   const amount = parseFloat(data.amount);
-  return amount > 0 && amount <= 1000; // Max 1000 ICP
+  return amount > 0 && amount <= 10000; // Max 10000 ICP
 }, {
-  message: 'Amount must be between 0.00000001 and 1000 ICP',
+  message: 'Amount must be between 0.00000001 and 10000 ICP',
 });
 
 type ContributionForm = z.infer<typeof contributionSchema>;
@@ -48,6 +47,8 @@ export const ContributionDialog: React.FC<ContributionDialogProps> = ({
   onContributionSuccess,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const {
     register,
@@ -64,108 +65,189 @@ export const ContributionDialog: React.FC<ContributionDialogProps> = ({
 
   const onSubmit = async (data: ContributionForm) => {
     setIsLoading(true);
+    setError(null);
+    setSuccess(false);
+    
     try {
       // First, register the user if not already registered
       try {
-        await fundFlowActor.register_user('Anonymous User', 'user@example.com');
+        await fundFlowActor.register_user('FundVerse User', 'user@fundverse.com');
       } catch (error) {
         // User might already be registered, continue
-        console.log('User registration skipped:', error);
+        console.log('User registration skipped (likely already registered):', error);
       }
 
+      // Get backend canister principal
+      const backendPrincipal = backendActor._canisterId || backendActor.canisterId;
+      
       // Make the ICP contribution
-      const contributionId = await fundFlowActor.contribute_icp(
-        backendActor.getCanisterPrincipal(),
+      const result = await fundFlowActor.contribute_icp(
+        backendPrincipal,
         campaignId,
         BigInt(amountE8s)
       );
 
-      // Confirm the payment (in a real app, this would be done after actual ICP transfer)
-      await fundFlowActor.confirm_payment(contributionId, backendActor.getCanisterPrincipal());
+      if ('Err' in result) {
+        throw new Error(result.Err);
+      }
 
-      reset();
-      onOpenChange(false);
-      onContributionSuccess();
+      const contributionId = result.Ok;
+
+      // Confirm the payment (in a real app, this would be done after actual ICP transfer)
+      const confirmResult = await fundFlowActor.confirm_payment(
+        contributionId, 
+        backendPrincipal
+      );
+
+      if ('Err' in confirmResult) {
+        throw new Error(confirmResult.Err);
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        reset();
+        onContributionSuccess();
+      }, 2000);
+
     } catch (error) {
       console.error('Failed to contribute:', error);
-      // You could add a toast notification here
+      const icError = handleICError(error);
+      setError(icError.message);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleClose = () => {
+    if (!isLoading) {
+      onOpenChange(false);
+      setError(null);
+      setSuccess(false);
+      reset();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle>Contribute ICP</DialogTitle>
-          <DialogDescription>
-            Make a contribution to "{campaignTitle}" using ICP coins.
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[450px] web3-card border-white/20">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="text-2xl web3-gradient-text flex items-center gap-2">
+            <Coins className="h-6 w-6" />
+            Contribute ICP
+          </DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            Make a contribution to <span className="text-white font-semibold">"{campaignTitle}"</span> using ICP coins on the Internet Computer.
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="amount">Amount (ICP)</Label>
-            <Input
-              id="amount"
-              type="number"
-              step="0.00000001"
-              {...register('amount')}
-              placeholder="0.00"
-            />
-            {errors.amount && (
-              <p className="text-sm text-red-500">{errors.amount.message}</p>
-            )}
-            {amount && (
-              <p className="text-sm text-muted-foreground">
-                {formatCurrency(parseFloat(amount))} ({amountE8s.toLocaleString()} e8s)
+        {success ? (
+          <div className="py-8 text-center space-y-4">
+            <div className="mx-auto w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center glow-green">
+              <CheckCircle className="h-8 w-8 text-green-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-semibold text-green-400">Contribution Successful!</h3>
+              <p className="text-muted-foreground">
+                Your contribution of {formatCurrency(parseFloat(amount || '0'))} has been processed.
               </p>
-            )}
-          </div>
-
-          <div className="bg-muted p-3 rounded-lg">
-            <h4 className="font-medium text-sm mb-2">Contribution Details</h4>
-            <div className="space-y-1 text-sm text-muted-foreground">
-              <div className="flex justify-between">
-                <span>Campaign ID:</span>
-                <span className="font-mono">{campaignId.toString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Payment Method:</span>
-                <span>ICP Transfer</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Network:</span>
-                <span>Internet Computer</span>
-              </div>
             </div>
           </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  Contribute
-                </>
+        ) : (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div className="space-y-3">
+              <Label htmlFor="amount" className="text-sm font-medium flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Amount (ICP)
+              </Label>
+              <Input
+                id="amount"
+                type="number"
+                step="0.00000001"
+                {...register('amount')}
+                placeholder="0.00000000"
+                className="web3-input h-12 text-lg"
+                disabled={isLoading}
+              />
+              {errors.amount && (
+                <p className="text-sm text-red-400 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.amount.message}
+                </p>
               )}
-            </Button>
-          </DialogFooter>
-        </form>
+              {amount && (
+                <div className="web3-card p-3 space-y-1">
+                  <p className="text-sm text-muted-foreground">Equivalent in e8s:</p>
+                  <p className="font-mono text-lg web3-gradient-text">
+                    {amountE8s.toLocaleString()} e8s
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="web3-card p-4 border-red-500/20 bg-red-500/10">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-400" />
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="web3-card p-4 space-y-3">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-400" />
+                Contribution Details
+              </h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Campaign ID:</span>
+                  <span className="font-mono text-white">#{campaignId.toString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Payment Method:</span>
+                  <span className="text-white">ICP Transfer</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Network:</span>
+                  <span className="text-white">Internet Computer</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Status:</span>
+                  <span className="text-green-400">Instant Settlement</span>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={isLoading}
+                className="btn-web3-secondary"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isLoading || !amount}
+                className="btn-web3-primary flex-1"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="mr-2 h-4 w-4" />
+                    Contribute {amount ? formatCurrency(parseFloat(amount)) : 'ICP'}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

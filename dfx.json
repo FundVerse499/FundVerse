@@ -22,6 +22,11 @@
       "type": "rust",
       "main": "src/Fund_Flow/src/lib.rs"
     },
+    "Admin": {
+      "type": "rust",
+      "package": "Admin",
+      "candid": "src/Admin/Admin.did"
+    },
     "FundVerse_frontend": {
       "dependencies": [
         "FundVerse_backend",

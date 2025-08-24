@@ -414,10 +414,7 @@ fn get_campaign_total_funding(campaign_id: u64) -> u64 {
     campaign_amount + icp_amount
 }
 
-// ------------- Demo Seed -------------
 
-#[init]
-fn init() {}
 
 
 // Export Candid for tooling & UI integration

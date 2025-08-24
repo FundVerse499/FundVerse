@@ -27,7 +27,7 @@ const host = isLocal ? 'http://localhost:4943' : 'https://ic0.app';
 
 // Internet Identity configuration
 const INTERNET_IDENTITY_URL = isLocal 
-  ? `http://localhost:4943?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai`
+  ? `http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943`
   : 'https://identity.ic0.app';
 
 // Global auth client instance

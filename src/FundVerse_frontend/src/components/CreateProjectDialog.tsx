@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import type { ActorSubclass } from "@dfinity/agent";
+<<<<<<< HEAD
+=======
+
+>>>>>>> 9d8c40b (Initial commit)
 import type { _SERVICE as FundVerseBackendService } from "../../../declarations/FundVerse_backend/FundVerse_backend.did";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,9 +20,17 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+<<<<<<< HEAD
 import type { FundVerseBackend } from '../lib/ic';
 import { Plus, Loader2 } from 'lucide-react';
 
+=======
+import { createFundVerseBackendActor} from '../lib/ic';
+import { Plus, Loader2 } from 'lucide-react';
+
+
+
+>>>>>>> 9d8c40b (Initial commit)
 const createProjectSchema = z.object({
   title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description must be less than 500 characters'),
@@ -47,7 +59,11 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+<<<<<<< HEAD
 
+=======
+  const [submitError, setSubmitError] = useState<string | null>(null); 
+>>>>>>> 9d8c40b (Initial commit)
   const {
     register,
     handleSubmit,
@@ -57,6 +73,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     resolver: zodResolver(createProjectSchema),
   });
 
+<<<<<<< HEAD
   const onSubmit = async (data: CreateProjectForm) => {
     setIsLoading(true);
     try {
@@ -83,6 +100,63 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       setIsLoading(false);
     }
   };
+=======
+  
+      
+const onSubmit = async (data: CreateProjectForm) => {
+  setIsLoading(true);
+  setSubmitError(null);
+  try {
+    // 1) goal -> e8s
+    const fundingGoalE8s = Math.floor(parseFloat(data.fundingGoal) * 100_000_000);
+    if (Number.isNaN(fundingGoalE8s) || fundingGoalE8s <= 0) {
+      throw new Error('Funding goal must be a positive number');
+    }
+
+    // 2) businessRegistration -> nat8
+    const businessRegNat8 = Number(data.businessRegistration) & 0xff;
+
+    // 3) create idea (بيرجع nat64 -> bigint في تايب سكريبت)
+    const ideaId: bigint = await backendActor.create_idea(
+      data.title,
+      data.description,
+      BigInt(fundingGoalE8s),
+      data.legalEntity,
+      data.contactInfo,
+      data.category,
+      businessRegNat8
+    );
+
+    // 4) نحسب end_date بعد 30 يوم (بالـ seconds)
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const endDateSecs = nowSecs + (30 * 24 * 60 * 60);
+
+    // 5) نعمل Campaign لنفس الـ idea (بـ نفس الـ goal)
+    const createRes = await backendActor.create_campaign(
+      // create_campaign بياخد nat64 → ابعتي BigInt
+      BigInt(ideaId),                // idea_id
+      BigInt(fundingGoalE8s),        // goal (e8s)
+      BigInt(endDateSecs)            // end_date (seconds)
+    );
+
+    // 6) تعامل مع Result { Ok | Err }
+    if ('Err' in createRes) {
+      throw new Error(createRes.Err);
+    }
+
+    // 7) نجاح → قفلي الديالوج واعملي refetch
+    reset();
+    setOpen(false);
+    onProjectCreated(); // دا بينادي loadCampaigns في الـ App.tsx بالفعل
+  } catch (err: any) {
+    console.error('Failed to create project/campaign:', err);
+    setSubmitError(err?.message ?? 'Failed to create project');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+>>>>>>> 9d8c40b (Initial commit)
 
   const categories = [
     'Technology',
@@ -210,6 +284,12 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               <p className="text-sm text-red-500">{errors.businessRegistration.message}</p>
             )}
           </div>
+<<<<<<< HEAD
+=======
+              {submitError && (
+             <p className="text-sm text-red-500">{submitError}</p>
+                )}
+>>>>>>> 9d8c40b (Initial commit)
 
           <DialogFooter>
             <Button

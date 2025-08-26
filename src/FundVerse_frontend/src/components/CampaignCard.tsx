@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
+<<<<<<< HEAD
+=======
+import { useNavigate } from 'react-router-dom';
+>>>>>>> 9d8c40b (Initial commit)
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
+<<<<<<< HEAD
 import { formatE8s, formatCurrency, calculateProgress, getDaysLeft, truncateAddress } from '../lib/utils';
+=======
+import { formatCurrency, calculateProgress, getDaysLeft, truncateAddress } from '../lib/utils';
+>>>>>>> 9d8c40b (Initial commit)
 import { FUND_FLOW_CANISTER_ID_STR } from '../lib/ic';
 import { Copy, ExternalLink, TrendingUp, Clock, Target, Zap, CheckCircle } from 'lucide-react';
 
@@ -30,7 +38,12 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   onContribute,
 }) => {
   const [copied, setCopied] = useState(false);
+<<<<<<< HEAD
   
+=======
+  const navigate = useNavigate();
+
+>>>>>>> 9d8c40b (Initial commit)
   const progress = calculateProgress(campaign.amount_raised, campaign.goal);
   const daysLeft = getDaysLeft(campaign.end_date);
   const isActive = daysLeft > 0;
@@ -185,6 +198,10 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           variant="outline" 
           size="sm"
           className="btn-web3-secondary"
+<<<<<<< HEAD
+=======
+          onClick={() => navigate(`/campaign/${campaign.id.toString()}`)}
+>>>>>>> 9d8c40b (Initial commit)
         >
           <ExternalLink className="h-4 w-4" />
         </Button>
@@ -193,4 +210,8 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
   );
 };
 
+<<<<<<< HEAD
 export default CampaignCard;
+=======
+export default CampaignCard;
+>>>>>>> 9d8c40b (Initial commit)

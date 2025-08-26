@@ -7,7 +7,11 @@ import { Principal } from '@dfinity/principal';
 
 // Import generated declarations
 import { 
+<<<<<<< HEAD
   createActor as createFundFlowActor, 
+=======
+  createActor as createFundFlowActorgenerated, 
+>>>>>>> 9d8c40b (Initial commit)
   canisterId as FUND_FLOW_CANISTER_ID,
   idlFactory as fundFlowIdl 
 } from "../../../declarations/Fund_Flow";
@@ -133,7 +137,11 @@ export const createFundVerseBackendActor = async (): Promise<ActorSubclass<FundV
 
 export const createFundFlowActor = async (): Promise<ActorSubclass<FundFlowService>> => {
   const agent = await createAgent();
+<<<<<<< HEAD
   return createFundFlowActor(FUND_FLOW_CANISTER_ID, { agent });
+=======
+  return createFundFlowActorgenerated(FUND_FLOW_CANISTER_ID, { agent });
+>>>>>>> 9d8c40b (Initial commit)
 };
 
 // Helper exports for canister IDs

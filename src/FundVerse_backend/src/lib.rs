@@ -104,7 +104,11 @@ pub struct CampaignCard {
     pub amount_raised: u64,
     pub goal: u64,
     pub end_date: u64,
+<<<<<<< HEAD
     pub days_left: i64,    // negative => ended
+=======
+    pub days_left: u64,    // negative => ended
+>>>>>>> 9d8c40b (Initial commit)
 }
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
@@ -137,7 +141,13 @@ fn now_secs() -> u64 {
 
 fn to_card(c: &Campaign, idea: &Idea) -> CampaignCard {
     let now = now_secs() as i64;
+<<<<<<< HEAD
     let days_left = ((c.end_date as i64) - now) / 86_400; // 86400 secs/day
+=======
+    let days_left_i64 = ((c.end_date as i64) - now) / 86_400;
+    let days_left = if days_left_i64 < 0 { 0 } else { days_left_i64 as u64 };
+    
+>>>>>>> 9d8c40b (Initial commit)
     CampaignCard {
         id: c.id,
         idea_id: c.idea_id,
@@ -150,6 +160,10 @@ fn to_card(c: &Campaign, idea: &Idea) -> CampaignCard {
     }
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 9d8c40b (Initial commit)
 fn get_idea(id: u64) -> Option<Idea> {
     IDEAS.with(|map| map.borrow().get(&id))
 }

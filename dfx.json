@@ -28,6 +28,7 @@
       "candid": "src/Admin/Admin.did"
     },
     "FundVerse_frontend": {
+<<<<<<< HEAD
       "dependencies": [
         "FundVerse_backend",
         "Fund_Flow"
@@ -38,6 +39,19 @@
       "type": "assets",
       "workspace": "FundVerse_frontend"
     }
+=======
+  "dependencies": [
+    "FundVerse_backend",
+    "Fund_Flow"
+  ],
+  "source": [
+    "src/FundVerse_frontend/dist"
+  ],
+  "type": "assets"
+}
+    
+    
+>>>>>>> 9d8c40b (Initial commit)
   },
   "defaults": {
     "build": {

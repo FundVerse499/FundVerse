@@ -129,7 +129,11 @@ export const ContributionDialog: React.FC<ContributionDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
+<<<<<<< HEAD
       <DialogContent className="sm:max-w-[450px] web3-card border-white/20">
+=======
+      <DialogContent className="sm:max-w-[450px] web3-card border-white/20 fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 md:max-w-[500px]">
+>>>>>>> 9d8c40b (Initial commit)
         <DialogHeader className="space-y-3">
           <DialogTitle className="text-2xl web3-gradient-text flex items-center gap-2">
             <Coins className="h-6 w-6" />

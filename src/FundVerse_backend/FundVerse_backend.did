@@ -5,7 +5,11 @@ type CampaignCard = record {
   end_date : nat64;
   idea_id : nat64;
   category : text;
+<<<<<<< HEAD
   days_left : int64;
+=======
+  days_left : nat64;
+>>>>>>> 9d8c40b (Initial commit)
   amount_raised : nat64;
 };
 type CampaignStatus = variant { Ended; Active };
